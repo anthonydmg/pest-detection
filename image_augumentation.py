@@ -47,11 +47,17 @@ def visualize_bbox(img, bbox, class_name, color=BOX_COLOR, thickness=2):
 
 def visualize_orig_aug_image(aug_image_df):
     total_images = len(aug_image_df) + 1
-    n_colums = 4
-    n_rows =  math.ceil(total_images/2) if total_images > 2 else 1 
+    print('total_images:', total_images)
+    n_colums = 4 if total_images >= 4 else total_images
+    n_rows =  math.ceil(total_images/n_colums) if total_images > n_colums else 1 
     fig, axes = plt.subplots(nrows= n_rows, ncols= n_colums, figsize = (12,10))
     for i in range(n_rows):
         for j in range(n_colums):
+            if n_rows > 1:
+                ax = axes[i,j]
+            else:
+                ax = axes[j]
+            ax.axis("off")
             if i * n_colums + j >= total_images:
                 continue
                   
@@ -59,16 +65,20 @@ def visualize_orig_aug_image(aug_image_df):
                 row = aug_image_df.iloc[0]
                 image_path = row["image_path"]
                 label_path = row["label_path"]
+                ax.set_title("Imagen Original")
             else:
-                    row = aug_image_df.iloc[i * n_colums + j - 1]
-                    image_path = row["image_output_path"]
-                    label_path = row["label_output_path"] 
+                row = aug_image_df.iloc[i * n_colums + j - 1]
+                image_path = row["image_output_path"]
+                label_path = row["label_output_path"]
+                ax.set_title(f"Imagen Trasformada {i * n_colums + j}")
             
             image = cv2.imread(image_path)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
            
             bboxes, labels = read_labels(label_path)
-            visualize(image, bboxes, labels, category_id_to_name, axis = axes[i,j])
+
+            visualize(image, bboxes, labels, category_id_to_name, axis = ax)
+            
     
     plt.tight_layout()
     plt.show()
@@ -280,10 +290,9 @@ def aug_image(row, transform):
     label_output_path = row["label_output_path"]
     image = cv2.imread(image_path)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    #image_name = '.'.join(image_path.split(os.path.sep)[-1].split('.')[:-1])
-    #labels_path = f"{os.path.dirname(image_path)}/labels"
+
     bboxes, labels = read_labels(label_path)
-    bboxes = [ yolo2albumentations(bbox) for bbox in bboxes]
+    #bboxes = [ yolo2albumentations(bbox) for bbox in bboxes]
     transformed = transform(image=image, bboxes=bboxes, category_ids=labels)
     image = transformed['image']
     bboxes = transformed['bboxes']
@@ -291,7 +300,7 @@ def aug_image(row, transform):
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
     cv2.imwrite(image_output_path, image)
-    bboxes = [ albumentations2yolo(bbox) for bbox in bboxes]
+    #bboxes = [ albumentations2yolo(bbox) for bbox in bboxes]
     save_labels(label_output_path, bboxes, labels)
 
 
@@ -300,17 +309,21 @@ def augmentation_images(data_path, transform):
     image_aug_df.apply(lambda row: aug_image(row, transform), axis= 1)
     original_image_path = random.choice(image_aug_df["image_path"].unique().tolist())
     visualize_orig_aug_image(image_aug_df[image_aug_df["image_path"] == original_image_path].copy())
+    original_image_path = random.choice(image_aug_df["image_path"].unique().tolist())
+    visualize_orig_aug_image(image_aug_df[image_aug_df["image_path"] == original_image_path].copy())
+    original_image_path = random.choice(image_aug_df["image_path"].unique().tolist())
+    visualize_orig_aug_image(image_aug_df[image_aug_df["image_path"] == original_image_path].copy())
     
 
 data_path = "./datasets/lyromiza/data"
 
 transform = A.Compose(
-    [A.HorizontalFlip(p=0.5),
-     A.VerticalFlip(p=0.5),
-     A.RandomBrightnessContrast(p=0.5),
-     A.GaussNoise(p=0.5),
-     A.MotionBlur(p=0.5)],
-    bbox_params=A.BboxParams(format='albumentations', label_fields=['category_ids']),
+    [A.HorizontalFlip(p=0.7),
+     A.VerticalFlip(p=0.7),
+     A.RandomBrightnessContrast(p=0.7),
+     A.GaussNoise(p=1.0),
+     A.MotionBlur(p=1.0)],
+    bbox_params=A.BboxParams(format='yolo', label_fields=['category_ids']),
 )
 
 augmentation_images(data_path, transform)
