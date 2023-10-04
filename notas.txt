@@ -1,3 +1,0 @@
-GaussNoise
-RandomBrightnessContrast
-MotionBlur
